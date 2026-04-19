@@ -944,7 +944,7 @@
     // ══════════════════════════════════════════════════════
     //  CONFIG — paste your Apps Script URL here after deploy
     // ══════════════════════════════════════════════════════
-    const API_URL = 'https://script.google.com/macros/s/AKfycbw8QL4czBq7Vlzh0idubSSARi2FXB7aBz3b1e3AnS6-IBWsDlzMtKWrSk0p_wGOixc0/exec'; // ← Replace in Step 6
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwNtm2FdxyF49LXm2eiMdajWmDktINJ_DatY12T7fEoArJs9T4Td_EU_nBUoA5sojE/exec'; // ← Replace in Step 6
     const PIN_CORRECT = '3016';              // ← Must match Code.gs
 
     // ── Category colours ──────────────────────────────────
@@ -1002,16 +1002,14 @@
     // ══════════════════════════════════════════════════════
     async function apiGet(params) {
       const url = API_URL + '?' + new URLSearchParams({ ...params, pin: PIN_CORRECT });
-      const r = await fetch(url);
+      const r = await fetch(url, { redirect: 'follow' });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error);
       return j.data;
     }
     async function apiPost(body) {
-      const r = await fetch(API_URL, {
-        method: 'POST', body: JSON.stringify({ ...body, pin: PIN_CORRECT }),
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const url = API_URL + '?' + new URLSearchParams({ ...body, pin: PIN_CORRECT });
+      const r = await fetch(url, { redirect: 'follow' });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error);
       return j.data;
