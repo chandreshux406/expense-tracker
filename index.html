@@ -96,33 +96,6 @@
       margin-bottom: 28px;
     }
 
-    .pin-dots {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      margin-bottom: 24px;
-    }
-
-    .pin-dot {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      border: 2px solid var(--border);
-      background: transparent;
-      transition: .2s;
-    }
-
-    .pin-dot.filled {
-      background: var(--purple);
-      border-color: var(--purple);
-    }
-
-    .pin-pad {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-    }
-
     .pin-btn {
       padding: 14px;
       font-size: 18px;
@@ -699,26 +672,17 @@
       <div class="pin-logo">💰</div>
       <div class="pin-title">Expense Tracker</div>
       <div class="pin-sub">Enter your PIN to continue</div>
-      <div class="pin-dots" id="pin-dots">
-        <div class="pin-dot" id="d0"></div>
-        <div class="pin-dot" id="d1"></div>
-        <div class="pin-dot" id="d2"></div>
-        <div class="pin-dot" id="d3"></div>
+      <div style="position:relative;margin-bottom:16px;">
+        <input id="pin-input" type="password" placeholder="Enter your password"
+          onkeydown="if(event.key==='Enter')checkPin()" autocomplete="current-password"
+          style="width:100%;padding:12px 44px 12px 14px;font-size:16px;border:1.5px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);letter-spacing:0.1em;" />
+        <button onclick="togglePinVisibility()" id="eye-btn"
+          style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted);padding:0;">👁</button>
       </div>
-      <div class="pin-pad">
-        <button class="pin-btn" onclick="pinPress('1')">1</button>
-        <button class="pin-btn" onclick="pinPress('2')">2</button>
-        <button class="pin-btn" onclick="pinPress('3')">3</button>
-        <button class="pin-btn" onclick="pinPress('4')">4</button>
-        <button class="pin-btn" onclick="pinPress('5')">5</button>
-        <button class="pin-btn" onclick="pinPress('6')">6</button>
-        <button class="pin-btn" onclick="pinPress('7')">7</button>
-        <button class="pin-btn" onclick="pinPress('8')">8</button>
-        <button class="pin-btn" onclick="pinPress('9')">9</button>
-        <button class="pin-btn" onclick="pinClear()" style="font-size:13px;color:var(--muted)">CLR</button>
-        <button class="pin-btn" onclick="pinPress('0')">0</button>
-        <button class="pin-btn" onclick="pinBack()" style="font-size:18px">⌫</button>
-      </div>
+      <button class="pin-btn" onclick="checkPin()"
+        style="width:100%;padding:13px;font-size:15px;font-weight:600;background:var(--purple);color:#fff;border:none;border-radius:10px;cursor:pointer;margin-bottom:8px;">
+        Unlock
+      </button>
       <div class="pin-err" id="pin-err"></div>
     </div>
   </div>
@@ -945,7 +909,7 @@
     // ══════════════════════════════════════════════════════
     //  CONFIG — paste your Apps Script URL here after deploy
     // ══════════════════════════════════════════════════════
-    const API_URL = 'https://script.google.com/macros/s/AKfycbzV5dD0L2JHyIKfAsgkVuwbn5GOaTO4ajQeaDcc4e53Zh5Qb6yh56vO0Rp3NJM5bO2B/exec'; // ← Replace with your Apps Script URL
+    const API_URL = 'https://script.google.com/macros/s/AKfycbxHwO7xgd804TOnIZuMl56otT2n-k7f7NjtkyA1m7gHic-Oh0PlgAi588n-ZQ0yyScX/exec'; // ← Replace with your Apps Script URL
     // PIN is validated server-side only — never stored here
 
     // ── Category colours ──────────────────────────────────
@@ -960,40 +924,32 @@
     // ── State ─────────────────────────────────────────────
     let DB = { expenses: [], savings: [], salary: [] };
     let dashChart = null;
-    let pinEntry = '';
 
     // ══════════════════════════════════════════════════════
     //  PIN LOCK
     // ══════════════════════════════════════════════════════
-    function pinPress(d) {
-      if (pinEntry.length >= 4) return;
-      pinEntry += d;
-      document.getElementById('d' + (pinEntry.length - 1)).classList.add('filled');
-      if (pinEntry.length === 4) setTimeout(checkPin, 180);
-    }
-    function pinBack() {
-      if (!pinEntry.length) return;
-      pinEntry = pinEntry.slice(0, -1);
-      document.getElementById('d' + pinEntry.length).classList.remove('filled');
-      document.getElementById('pin-err').textContent = '';
-    }
     function pinClear() {
-      pinEntry = '';
-      [0, 1, 2, 3].forEach(i => document.getElementById('d' + i).classList.remove('filled'));
+      document.getElementById('pin-input').value = '';
       document.getElementById('pin-err').textContent = '';
+    }
+    function togglePinVisibility() {
+      const input = document.getElementById('pin-input');
+      input.type = input.type === 'password' ? 'text' : 'password';
     }
     async function checkPin() {
-      // Validate PIN against server — PIN is never stored in this file
+      const pin = document.getElementById('pin-input').value;
+      if (!pin) { document.getElementById('pin-err').textContent = 'Please enter your password.'; return; }
       try {
         document.getElementById('pin-err').textContent = 'Checking…';
-        await jsonp({ action: 'verifyPin', pin: pinEntry });
-        sessionStorage.setItem('et_pin', pinEntry);
+        await jsonp({ action: 'verifyPin', pin });
+        sessionStorage.setItem('et_pin', pin);
         document.getElementById('pin-screen').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         loadAll();
       } catch (e) {
-        document.getElementById('pin-err').textContent = 'Incorrect PIN. Try again.';
+        document.getElementById('pin-err').textContent = 'Incorrect password. Try again.';
         pinClear();
+        document.getElementById('pin-input').focus();
       }
     }
     function lockApp() {
@@ -1001,6 +957,7 @@
       document.getElementById('pin-screen').style.display = 'flex';
       document.getElementById('app').style.display = 'none';
       pinClear();
+      setTimeout(() => document.getElementById('pin-input').focus(), 100);
     }
 
     // ══════════════════════════════════════════════════════
