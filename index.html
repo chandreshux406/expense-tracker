@@ -938,18 +938,45 @@
     }
     async function checkPin() {
       const pin = document.getElementById('pin-input').value;
-      if (!pin) { document.getElementById('pin-err').textContent = 'Please enter your password.'; return; }
+      const errEl = document.getElementById('pin-err');
+      if (!pin) { errEl.textContent = 'Please enter your password.'; return; }
+
+      // If no API URL set yet, do client-side check is impossible — just unlock
+      if (!API_URL || API_URL === 'YOUR_APPS_SCRIPT_URL') {
+        errEl.textContent = 'API URL not set in index.html.';
+        return;
+      }
+
+      errEl.textContent = 'Checking…';
+      errEl.style.color = 'var(--muted)';
+
       try {
-        document.getElementById('pin-err').textContent = 'Checking…';
-        await jsonp({ action: 'verifyPin', pin });
+        // Try verifyPin first, fall back to getAll if verifyPin not in this deployment
+        try {
+          await jsonp({ action: 'verifyPin', pin });
+        } catch (e1) {
+          // If error is NOT "Invalid PIN", try getAll as fallback verification
+          if (e1.message && e1.message.includes('Invalid PIN')) throw e1;
+          // verifyPin may not exist in old deployment — try getAll instead
+          await jsonp({ action: 'getAll', pin });
+        }
         sessionStorage.setItem('et_pin', pin);
+        errEl.textContent = '';
         document.getElementById('pin-screen').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         loadAll();
       } catch (e) {
-        document.getElementById('pin-err').textContent = 'Incorrect password. Try again.';
-        pinClear();
-        document.getElementById('pin-input').focus();
+        errEl.style.color = 'var(--red)';
+        if (e.message && e.message.includes('timed out')) {
+          errEl.textContent = 'Connection timed out — check your API URL.';
+        } else if (e.message && (e.message.includes('Invalid PIN') || e.message.includes('invalid'))) {
+          errEl.textContent = 'Incorrect password. Try again.';
+          pinClear();
+          document.getElementById('pin-input').focus();
+        } else {
+          errEl.textContent = 'Error: ' + e.message + ' — try redeploying Apps Script.';
+          pinClear();
+        }
       }
     }
     function lockApp() {
