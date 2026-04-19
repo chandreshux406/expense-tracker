@@ -909,7 +909,7 @@
     // ══════════════════════════════════════════════════════
     //  CONFIG — paste your Apps Script URL here after deploy
     // ══════════════════════════════════════════════════════
-    const API_URL = 'https://script.google.com/macros/s/AKfycbxHwO7xgd804TOnIZuMl56otT2n-k7f7NjtkyA1m7gHic-Oh0PlgAi588n-ZQ0yyScX/exec'; // ← Replace with your Apps Script URL
+    const API_URL = 'https://script.google.com/macros/s/AKfycbzV5dD0L2JHyIKfAsgkVuwbn5GOaTO4ajQeaDcc4e53Zh5Qb6yh56vO0Rp3NJM5bO2B/exec'; // ← Replace with your Apps Script URL
     // PIN is validated server-side only — never stored here
 
     // ── Category colours ──────────────────────────────────
@@ -1223,7 +1223,7 @@
       if (fm) list = list.filter(e => expMonth(e) === fm);
       if (fc) list = list.filter(e => expCat(e) === fc);
       if (fy) list = list.filter(e => String(expYear(e)) === fy);
-      list.sort((a, b) => expId(b).localeCompare(expId(a)));
+      list.sort((a, b) => String(expId(b)).localeCompare(String(expId(a))));
       const total = list.reduce((s, e) => s + expAmt(e), 0);
       const el = document.getElementById('expense-list');
       if (!list.length) { el.innerHTML = '<div class="empty">No expenses found</div>'; return; }
