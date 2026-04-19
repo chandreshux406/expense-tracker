@@ -808,7 +808,7 @@
             </select>
           </div>
           <div class="form-group"><label class="form-label">Year</label>
-            <input id="exp-year" type="number" value="2025" />
+            <input id="exp-year" type="number" value="2026" />
           </div>
         </div>
         <button class="btn primary" onclick="addExpense()">+ Add expense</button>
@@ -846,6 +846,7 @@
           <option>2024</option>
           <option>2025</option>
           <option>2026</option>
+          <option>2027</option>
         </select>
       </div>
       <div id="expense-list"></div>
@@ -893,7 +894,7 @@
             </select>
           </div>
           <div class="form-group"><label class="form-label">Year</label>
-            <input id="sav-year" type="number" value="2025" />
+            <input id="sav-year" type="number" value="2026" />
           </div>
         </div>
         <button class="btn primary" onclick="addSaving()">+ Add saving</button>
@@ -929,7 +930,7 @@
             </select>
           </div>
           <div class="form-group"><label class="form-label">Year</label>
-            <input id="sal-year" type="number" value="2025" />
+            <input id="sal-year" type="number" value="2026" />
           </div>
         </div>
         <button class="btn primary" onclick="addSalary()">+ Add income</button>
@@ -944,7 +945,7 @@
     // ══════════════════════════════════════════════════════
     //  CONFIG — paste your Apps Script URL here after deploy
     // ══════════════════════════════════════════════════════
-    const API_URL = 'https://script.google.com/macros/s/AKfycby5o_idUvIpdg3nPH_hqI5RoTge_rzKXKgZ7VoKwcVEPk6npkluM5w_yTn91AR5xGXV/exec'; // ← Replace in Step 6
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwNtm2FdxyF49LXm2eiMdajWmDktINJ_DatY12T7fEoArJs9T4Td_EU_nBUoA5sojE/exec'; // ← Replace in Step 6
     const PIN_CORRECT = '3016';              // ← Must match Code.gs
 
     // ── Category colours ──────────────────────────────────
@@ -1036,9 +1037,9 @@
       setStatus('Loading your data…');
       try {
         const data = await apiGet({ action: 'getAll' });
-        DB.expenses = data.expenses || [];
-        DB.savings = data.savings || [];
-        DB.salary = data.salary || [];
+        DB.expenses = (data.expenses || []).map(e => ({ ...e, Amount: Number(e.Amount || e.amt || 0), Year: Number(e.Year || e.year || 0) }));
+        DB.savings = (data.savings || []).map(s => ({ ...s, Amount: Number(s.Amount || s.amt || 0), Year: Number(s.Year || s.year || 0) }));
+        DB.salary = (data.salary || []).map(s => ({ ...s, Amount: Number(s.Amount || s.amt || 0), Year: Number(s.Year || s.year || 0) }));
         // Seed sample data if sheets are empty
         if (!DB.expenses.length && !DB.savings.length && !DB.salary.length) {
           await seedSampleData();
@@ -1056,14 +1057,14 @@
     }
 
     async function seedSampleData() {
-      const y = 2025; const m = 'April';
+      const y = new Date().getFullYear(); const m = MONTHS[new Date().getMonth()];
       const exp = [
-        { desc: 'Swiggy lunch', amt: 320, cat: 'Food & Dining', date: '2025-04-10', month: m, year: y },
-        { desc: 'Metro card', amt: 500, cat: 'Transport', date: '2025-04-08', month: m, year: y },
-        { desc: 'Electricity bill', amt: 1800, cat: 'Utilities', date: '2025-04-05', month: m, year: y },
-        { desc: 'Amazon order', amt: 2400, cat: 'Shopping', date: '2025-04-12', month: m, year: y },
+        { desc: 'Swiggy lunch', amt: 320, cat: 'Food & Dining', date: new Date().toISOString().split('T')[0], month: m, year: y },
+        { desc: 'Metro card', amt: 500, cat: 'Transport', date: new Date().toISOString().split('T')[0], month: m, year: y },
+        { desc: 'Electricity bill', amt: 1800, cat: 'Utilities', date: new Date().toISOString().split('T')[0], month: m, year: y },
+        { desc: 'Amazon order', amt: 2400, cat: 'Shopping', date: new Date().toISOString().split('T')[0], month: m, year: y },
         { desc: 'Gym membership', amt: 1500, cat: 'Health', date: '2025-04-01', month: m, year: y },
-        { desc: 'Netflix', amt: 649, cat: 'Entertainment', date: '2025-04-01', month: m, year: y },
+        { desc: 'Netflix', amt: 649, cat: 'Entertainment', date: new Date().toISOString().split('T')[0], month: m, year: y },
       ];
       const sav = [
         { name: 'Parag Parikh Flexi SIP', type: 'Mutual Fund SIP', amt: 5000, month: m, year: y },
@@ -1138,8 +1139,8 @@
       document.getElementById('dash-month-label').textContent = cm + ' ' + cy;
 
       const mExp = DB.expenses.filter(e => expMonth(e) === cm && expYear(e) === cy);
-      const mSav = DB.savings.filter(s => savMonth(s) === cm);
-      const mSal = DB.salary.filter(s => salMonth(s) === cm);
+      const mSav = DB.savings.filter(s => savMonth(s) === cm && (Number(s.Year || s.year || cy) === cy));
+      const mSal = DB.salary.filter(s => salMonth(s) === cm && (Number(s.Year || s.year || cy) === cy));
 
       const totExp = mExp.reduce((s, e) => s + expAmt(e), 0);
       const totSav = mSav.reduce((s, e) => s + savAmt(e), 0);
@@ -1229,11 +1230,11 @@
       const cat = document.getElementById('exp-cat').value;
       const date = document.getElementById('exp-date').value;
       const month = document.getElementById('exp-month').value;
-      const year = parseInt(document.getElementById('exp-year').value) || 2025;
+      const year = parseInt(document.getElementById('exp-year').value) || new Date().getFullYear();
       if (!desc || !amt || amt <= 0) { showToast('Fill in description and amount'); return; }
       try {
         const r = await apiPost({ action: 'addExpense', desc, amt, cat, date, month, year });
-        DB.expenses.push({ ID: r.id, Description: desc, Amount: amt, Category: cat, Date: date, Month: month, Year: year });
+        DB.expenses.push({ ID: r.id, Description: desc, Amount: amt, Category: cat, Date: date, Month: month, Year: Number(year) });
         document.getElementById('exp-desc').value = '';
         document.getElementById('exp-amt').value = '';
         renderExpenses(); renderDashboard();
@@ -1285,11 +1286,11 @@
       const type = document.getElementById('sav-type').value;
       const amt = parseFloat(document.getElementById('sav-amt').value);
       const month = document.getElementById('sav-month').value;
-      const year = parseInt(document.getElementById('sav-year').value) || 2025;
+      const year = parseInt(document.getElementById('sav-year').value) || new Date().getFullYear();
       if (!name || !amt || amt <= 0) { showToast('Fill in name and amount'); return; }
       try {
         const r = await apiPost({ action: 'addSaving', name, type, amt, month, year });
-        DB.savings.push({ ID: r.id, Name: name, Type: type, Amount: amt, Month: month, Year: year });
+        DB.savings.push({ ID: r.id, Name: name, Type: type, Amount: amt, Month: month, Year: Number(year) });
         document.getElementById('sav-name').value = '';
         document.getElementById('sav-amt').value = '';
         renderSavings(); renderDashboard();
@@ -1342,11 +1343,11 @@
       const source = document.getElementById('sal-source').value.trim();
       const amt = parseFloat(document.getElementById('sal-amt').value);
       const month = document.getElementById('sal-month').value;
-      const year = parseInt(document.getElementById('sal-year').value) || 2025;
+      const year = parseInt(document.getElementById('sal-year').value) || new Date().getFullYear();
       if (!source || !amt || amt <= 0) { showToast('Fill in source and amount'); return; }
       try {
         const r = await apiPost({ action: 'addSalary', source, amt, month, year });
-        DB.salary.push({ ID: r.id, Source: source, Amount: amt, Month: month, Year: year });
+        DB.salary.push({ ID: r.id, Source: source, Amount: amt, Month: month, Year: Number(year) });
         document.getElementById('sal-source').value = '';
         document.getElementById('sal-amt').value = '';
         renderSalary(); renderDashboard();
@@ -1399,7 +1400,12 @@
 
     // ── Init ──────────────────────────────────────────────────────
     const today = new Date();
+    const curY = today.getFullYear();
     document.getElementById('exp-date').value = today.toISOString().split('T')[0];
+    // Set current year on all year inputs
+    ['exp-year', 'sav-year', 'sal-year'].forEach(id => {
+      document.getElementById(id).value = curY;
+    });
     const curM = MONTHS[today.getMonth()];
     ['exp-month', 'sav-month', 'sal-month'].forEach(id => {
       const el = document.getElementById(id);
