@@ -944,7 +944,7 @@
     // ══════════════════════════════════════════════════════
     //  CONFIG — paste your Apps Script URL here after deploy
     // ══════════════════════════════════════════════════════
-    const API_URL = 'https://script.google.com/macros/s/AKfycbwNtm2FdxyF49LXm2eiMdajWmDktINJ_DatY12T7fEoArJs9T4Td_EU_nBUoA5sojE/exec'; // ← Replace in Step 6
+    const API_URL = 'https://script.google.com/macros/s/AKfycby5o_idUvIpdg3nPH_hqI5RoTge_rzKXKgZ7VoKwcVEPk6npkluM5w_yTn91AR5xGXV/exec'; // ← Replace in Step 6
     const PIN_CORRECT = '3016';              // ← Must match Code.gs
 
     // ── Category colours ──────────────────────────────────
@@ -1000,20 +1000,29 @@
     // ══════════════════════════════════════════════════════
     //  API
     // ══════════════════════════════════════════════════════
-    async function apiGet(params) {
-      const url = API_URL + '?' + new URLSearchParams({ ...params, pin: PIN_CORRECT });
-      const r = await fetch(url, { redirect: 'follow' });
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error);
-      return j.data;
+    function jsonp(params) {
+      return new Promise((resolve, reject) => {
+        const cbName = 'cb_' + Math.random().toString(36).slice(2);
+        const timeout = setTimeout(() => {
+          delete window[cbName];
+          reject(new Error('Request timed out'));
+        }, 10000);
+        window[cbName] = (data) => {
+          clearTimeout(timeout);
+          delete window[cbName];
+          if (data.ok) resolve(data.data);
+          else reject(new Error(data.error));
+        };
+        const url = API_URL + '?' + new URLSearchParams({ ...params, pin: PIN_CORRECT, callback: cbName });
+        const s = document.createElement('script');
+        s.src = url;
+        s.onerror = () => { clearTimeout(timeout); delete window[cbName]; reject(new Error('Failed to reach API - check your URL')); };
+        document.head.appendChild(s);
+        setTimeout(() => s.remove(), 12000);
+      });
     }
-    async function apiPost(body) {
-      const url = API_URL + '?' + new URLSearchParams({ ...body, pin: PIN_CORRECT });
-      const r = await fetch(url, { redirect: 'follow' });
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error);
-      return j.data;
-    }
+    async function apiGet(params) { return jsonp(params); }
+    async function apiPost(body) { return jsonp(body); }
 
     function setStatus(msg, type = '') {
       const el = document.getElementById('status-bar');
