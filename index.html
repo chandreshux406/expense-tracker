@@ -450,6 +450,46 @@
       white-space: nowrap;
     }
 
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin: 2px 3px 0 0;
+      background: var(--purple-light);
+      color: var(--purple);
+    }
+
+    .tag-input-wrap {
+      position: relative;
+    }
+
+    .tag-suggestions {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      z-index: 100;
+      max-height: 150px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .tag-suggestion {
+      padding: 7px 12px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .tag-suggestion:hover {
+      background: var(--purple-light);
+      color: var(--purple);
+    }
+
     .exp-dot {
       width: 10px;
       height: 10px;
@@ -895,6 +935,11 @@
           <div class="form-group"><label class="form-label">Year</label>
             <input id="exp-year" type="number" value="2026" />
           </div>
+          <div class="form-group" style="grid-column:1/-1"><label class="form-label">Tags <span
+                style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional — e.g. work,
+                travel, family)</span></label>
+            <input id="exp-tags" placeholder="Add tags separated by commas" />
+          </div>
         </div>
         <button class="btn primary" onclick="addExpense()">+ Add expense</button>
       </div>
@@ -947,6 +992,8 @@
           <option value="20000">Above ₹20,000</option>
           <option value="50000">Above ₹50,000</option>
         </select>
+        <input id="flt-tag" placeholder="🏷 Filter by tag" oninput="renderExpenses()"
+          style="max-width:150px;font-size:13px;" />
       </div>
       <div id="expense-list"></div>
     </div>
@@ -1173,7 +1220,7 @@
       setStatus('Loading your data…');
       try {
         const data = await apiGet({ action: 'getAll' });
-        DB.expenses = (data.expenses || []).map(e => ({ ...e, Amount: Number(e.Amount || e.amt || 0), Year: Number(e.Year || e.year || 0) }));
+        DB.expenses = (data.expenses || []).map(e => ({ ...e, Amount: Number(e.Amount || e.amt || 0), Year: Number(e.Year || e.year || 0), Tags: e.Tags || e.tags || '' }));
         DB.savings = (data.savings || []).map(s => ({ ...s, Amount: Number(s.Amount || s.amt || 0), Year: Number(s.Year || s.year || 0) }));
         DB.salary = (data.salary || []).map(s => ({ ...s, Amount: Number(s.Amount || s.amt || 0), Year: Number(s.Year || s.year || 0) }));
         // Seed sample data if sheets are empty
@@ -1247,6 +1294,7 @@
     function expYear(e) { return Number(e.Year ?? e.year ?? 0); }
     function expDate(e) { return e.Date ?? e.date ?? ''; }
     function expId(e) { return e.ID ?? e.id ?? ''; }
+    function expTags(e) { return e.Tags ?? e.tags ?? ''; }
 
     function savAmt(s) { return Number(s.Amount ?? s.amt ?? 0); }
     function savName(s) { return s.Name ?? s.name ?? ''; }
@@ -1435,12 +1483,14 @@
       const date = document.getElementById('exp-date').value;
       const month = document.getElementById('exp-month').value;
       const year = parseInt(document.getElementById('exp-year').value) || new Date().getFullYear();
+      const tags = document.getElementById('exp-tags').value.trim();
       if (!desc || !amt || amt <= 0) { showToast('Fill in description and amount'); return; }
       try {
-        const r = await apiPost({ action: 'addExpense', desc, amt, cat, date, month, year });
-        DB.expenses.push({ ID: r.id, Description: desc, Amount: amt, Category: cat, Date: date, Month: month, Year: Number(year) });
+        const r = await apiPost({ action: 'addExpense', desc, amt, cat, date, month, year, tags });
+        DB.expenses.push({ ID: r.id, Description: desc, Amount: amt, Category: cat, Date: date, Month: month, Year: Number(year), Tags: tags });
         document.getElementById('exp-desc').value = '';
         document.getElementById('exp-amt').value = '';
+        document.getElementById('exp-tags').value = '';
         renderExpenses(); renderDashboard();
         showToast('Expense saved to Google Sheet ✓');
       } catch (e) { showToast('Error: ' + e.message); }
@@ -1489,6 +1539,8 @@
       if (fc) list = list.filter(e => expCat(e) === fc);
       if (fy) list = list.filter(e => String(expYear(e)) === fy);
       if (showBigOnly) list = list.filter(e => expAmt(e) >= bigAmt);
+      const ftag = document.getElementById('flt-tag').value.trim().toLowerCase();
+      if (ftag) list = list.filter(e => expTags(e).toLowerCase().includes(ftag));
 
       // Sort
       if (sort === 'date' || sort === 'date-asc') {
@@ -1525,6 +1577,7 @@
         <div class="exp-info">
           <div class="exp-desc">${expDesc(e)}${isBig ? '<span class="big-txn-badge">Big txn</span>' : ''}</div>
           <div class="exp-meta">${expCat(e)} · ${fmtDate(expDate(e)) || expMonth(e) + ' ' + expYear(e)}</div>
+          ${expTags(e) ? '<div style="margin-top:3px">' + expTags(e).split(',').map(t => '<span class="tag">#' + t.trim() + '</span>').join('') + '</div>' : ''}
         </div>
         <div class="exp-amt">${fmt(expAmt(e))}</div>
         <button class="edit-btn" onclick="openEditExpense('${expId(e)}')">✏️</button>
@@ -1692,6 +1745,8 @@
         <select id="edit-month">${monthOpts(expMonth(e))}</select></div>
       <div class="form-group"><label class="form-label">Year</label>
         <input id="edit-year" type="number" value="${expYear(e)}" /></div>
+      <div class="form-group" style="grid-column:1/-1"><label class="form-label">Tags</label>
+        <input id="edit-tags" placeholder="work, travel, family…" value="${expTags(e)}" /></div>
     </div>`;
       document.getElementById('edit-modal').style.display = 'flex';
     }
@@ -1754,12 +1809,12 @@
           const date = document.getElementById('edit-date').value;
           const month = document.getElementById('edit-month').value;
           const year = parseInt(document.getElementById('edit-year').value) || new Date().getFullYear();
+          const tags = document.getElementById('edit-tags').value.trim();
           if (!desc) { showToast('Enter a description'); return; }
-          // Delete old + add new (Google Sheets has no update API via JSONP)
           await apiGet({ action: 'deleteExpense', id });
-          const r = await apiPost({ action: 'addExpense', desc, amt, cat, date, month, year });
+          const r = await apiPost({ action: 'addExpense', desc, amt, cat, date, month, year, tags });
           DB.expenses = DB.expenses.filter(e => String(expId(e)) !== String(id));
-          DB.expenses.push({ ID: r.id, Description: desc, Amount: amt, Category: cat, Date: date, Month: month, Year: Number(year) });
+          DB.expenses.push({ ID: r.id, Description: desc, Amount: amt, Category: cat, Date: date, Month: month, Year: Number(year), Tags: tags });
           renderExpenses(); renderDashboard();
 
         } else if (type === 'saving') {
