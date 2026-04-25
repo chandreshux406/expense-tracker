@@ -133,6 +133,10 @@
   .exp-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px;
               background: var(--surface); border: 1px solid var(--border);
               border-radius: var(--radius); margin-bottom: 7px; }
+  .exp-item.big-txn { border-color: #BA7517; background: var(--amber-light); }
+  .big-txn-badge { font-size: 10px; font-weight: 700; color: #BA7517;
+                   background: #FAEEDA; padding: 2px 6px; border-radius: 10px;
+                   margin-left: 6px; white-space: nowrap; }
   .exp-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   .exp-info { flex: 1; min-width: 0; }
   .exp-desc { font-size: 14px; font-weight: 500; white-space: nowrap;
@@ -329,6 +333,20 @@
         <option>Rent</option><option>Education</option><option>Other</option></select>
       <select id="flt-year" onchange="renderExpenses()"><option value="">All years</option>
         <option>2024</option><option>2025</option><option>2026</option><option>2027</option></select>
+      <select id="flt-sort" onchange="renderExpenses()">
+        <option value="date">Sort: Latest first</option>
+        <option value="date-asc">Sort: Oldest first</option>
+        <option value="amt-desc">Sort: Highest amount</option>
+        <option value="amt-asc">Sort: Lowest amount</option>
+      </select>
+      <button id="flt-big" class="btn" onclick="toggleBigTxn()"
+        style="white-space:nowrap;font-size:12px;">💰 Big txns only</button>
+      <select id="flt-big-amt" onchange="renderExpenses()" style="max-width:130px;display:none">
+        <option value="10000">Above ₹10,000</option>
+        <option value="5000">Above ₹5,000</option>
+        <option value="20000">Above ₹20,000</option>
+        <option value="50000">Above ₹50,000</option>
+      </select>
     </div>
     <div id="expense-list"></div>
   </div>
@@ -793,31 +811,81 @@ async function deleteExpense(id) {
   } catch(e) { showToast('Error: '+e.message); }
 }
 
+let showBigOnly = false;
+
+function toggleBigTxn() {
+  showBigOnly = !showBigOnly;
+  const btn    = document.getElementById('flt-big');
+  const amtSel = document.getElementById('flt-big-amt');
+  btn.style.background    = showBigOnly ? 'var(--amber)' : '';
+  btn.style.color         = showBigOnly ? '#fff' : '';
+  btn.style.borderColor   = showBigOnly ? 'var(--amber)' : '';
+  amtSel.style.display    = showBigOnly ? 'block' : 'none';
+  renderExpenses();
+}
+
+function fmtDate(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return parts[2] + ' ' + months[parseInt(parts[1])-1] + ' ' + parts[0];
+}
+
 function renderExpenses() {
-  const fm = document.getElementById('flt-month').value;
-  const fc = document.getElementById('flt-cat').value;
-  const fy = document.getElementById('flt-year').value;
+  const fm      = document.getElementById('flt-month').value;
+  const fc      = document.getElementById('flt-cat').value;
+  const fy      = document.getElementById('flt-year').value;
+  const sort    = document.getElementById('flt-sort').value;
+  const bigAmt  = showBigOnly ? parseInt(document.getElementById('flt-big-amt').value) : 0;
+
   let list = [...DB.expenses];
-  if (fm) list = list.filter(e=>expMonth(e)===fm);
-  if (fc) list = list.filter(e=>expCat(e)===fc);
-  if (fy) list = list.filter(e=>String(expYear(e))===fy);
-  list.sort((a,b)=>String(expId(b)).localeCompare(String(expId(a))));
-  const total = list.reduce((s,e)=>s+expAmt(e),0);
-  const el = document.getElementById('expense-list');
-  if (!list.length) { el.innerHTML='<div class="empty">No expenses found</div>'; return; }
-  el.innerHTML = `<div class="list-header"><span>${list.length} expense${list.length!==1?'s':''}</span>
+  if (fm) list = list.filter(e => expMonth(e)===fm);
+  if (fc) list = list.filter(e => expCat(e)===fc);
+  if (fy) list = list.filter(e => String(expYear(e))===fy);
+  if (showBigOnly) list = list.filter(e => expAmt(e) >= bigAmt);
+
+  // Sort
+  if (sort === 'date' || sort === 'date-asc') {
+    list.sort((a,b) => {
+      const da = expDate(a) || '0000-00-00';
+      const db = expDate(b) || '0000-00-00';
+      return sort === 'date' ? db.localeCompare(da) : da.localeCompare(db);
+    });
+  } else if (sort === 'amt-desc') {
+    list.sort((a,b) => expAmt(b) - expAmt(a));
+  } else if (sort === 'amt-asc') {
+    list.sort((a,b) => expAmt(a) - expAmt(b));
+  }
+
+  const total    = list.reduce((s,e) => s+expAmt(e), 0);
+  const bigCount = list.filter(e => expAmt(e) >= 10000).length;
+  const el       = document.getElementById('expense-list');
+
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">' + (showBigOnly ? 'No big transactions found' : 'No expenses found') + '</div>';
+    return;
+  }
+
+  el.innerHTML = `<div class="list-header">
+    <span>${list.length} expense${list.length!==1?'s':''}
+      ${bigCount>0 && !showBigOnly ? '<span class="big-txn-badge">'+bigCount+' big txn'+(bigCount>1?'s':'')+'</span>' : ''}
+    </span>
     <span class="list-total">${fmt(total)}</span></div>`
-    + list.map(e=>`
-      <div class="exp-item">
+    + list.map(e => {
+      const isBig = expAmt(e) >= 10000;
+      return `
+      <div class="exp-item${isBig?' big-txn':''}">
         <div class="exp-dot" style="background:${CAT_COLOR[expCat(e)]||'#888'}"></div>
         <div class="exp-info">
-          <div class="exp-desc">${expDesc(e)}</div>
-          <div class="exp-meta">${expCat(e)} · ${expMonth(e)} ${expYear(e)}${expDate(e)?' · '+expDate(e):''}</div>
+          <div class="exp-desc">${expDesc(e)}${isBig?'<span class="big-txn-badge">Big txn</span>':''}</div>
+          <div class="exp-meta">${expCat(e)} · ${fmtDate(expDate(e))||expMonth(e)+' '+expYear(e)}</div>
         </div>
         <div class="exp-amt">${fmt(expAmt(e))}</div>
         <button class="edit-btn" onclick="openEditExpense('${expId(e)}')">✏️</button>
         <button class="del-btn" onclick="deleteExpense('${expId(e)}')">✕</button>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 }
 
 // ══════════════════════════════════════════════════════
