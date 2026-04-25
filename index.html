@@ -1749,6 +1749,14 @@
         <input id="edit-tags" placeholder="work, travel, family…" value="${expTags(e)}" /></div>
     </div>`;
       document.getElementById('edit-modal').style.display = 'flex';
+      // Force date value after DOM update (fixes blank date issue with Sheet data)
+      const dateVal = expDate(e);
+      if (dateVal) {
+        setTimeout(() => {
+          const dateEl = document.getElementById('edit-date');
+          if (dateEl) dateEl.value = String(dateVal).substring(0, 10);
+        }, 0);
+      }
     }
 
     function openEditSaving(id) {
@@ -1794,13 +1802,23 @@
     function closeModal() {
       document.getElementById('edit-modal').style.display = 'none';
       editContext = null;
+      isSaving = false;
+      const saveBtn = document.querySelector('#edit-modal .btn.primary');
+      if (saveBtn) { saveBtn.textContent = 'Save changes'; saveBtn.disabled = false; }
     }
+
+    let isSaving = false;
 
     async function saveEdit() {
       if (!editContext) return;
+      if (isSaving) return; // prevent double click
       const { type, id } = editContext;
       const amt = parseFloat(document.getElementById('edit-amt').value);
       if (!amt || amt <= 0) { showToast('Enter a valid amount'); return; }
+
+      isSaving = true;
+      const saveBtn = document.querySelector('#edit-modal .btn.primary');
+      if (saveBtn) { saveBtn.textContent = 'Saving…'; saveBtn.disabled = true; }
 
       try {
         if (type === 'expense') {
@@ -1841,9 +1859,13 @@
           renderSalary(); renderDashboard();
         }
 
+        isSaving = false;
         closeModal();
         showToast('Updated successfully ✓');
       } catch (e) {
+        isSaving = false;
+        const saveBtn = document.querySelector('#edit-modal .btn.primary');
+        if (saveBtn) { saveBtn.textContent = 'Save changes'; saveBtn.disabled = false; }
         showToast('Error: ' + e.message);
       }
     }
