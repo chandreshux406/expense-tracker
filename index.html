@@ -1316,14 +1316,15 @@
       const pctExp = totInc ? Math.round(totExp / totInc * 100) : 0;
       const pctSav = totInc ? Math.round(totSav / totInc * 100) : 0;
 
+      const filterLabel = { 'day': 'Today', 'week': 'This week', 'month': 'This month', 'year': 'This year', 'custom': 'Selected period' }[dashFilter] || 'Period';
       document.getElementById('dash-metrics').innerHTML = `
-    <div class="metric"><div class="metric-label">Monthly income</div>
+    <div class="metric"><div class="metric-label">Income — ${label}</div>
       <div class="metric-value green">${fmt(totInc)}</div>
-      <div class="metric-badge badge-green">${label}</div></div>
-    <div class="metric"><div class="metric-label">Total expenses</div>
+      <div class="metric-badge badge-green">${mSal.length} entr${mSal.length === 1 ? 'y' : 'ies'}</div></div>
+    <div class="metric"><div class="metric-label">Expenses — ${label}</div>
       <div class="metric-value red">${fmt(totExp)}</div>
-      <div class="metric-badge badge-red">${pctExp}% of income</div></div>
-    <div class="metric"><div class="metric-label">Total savings</div>
+      <div class="metric-badge badge-red">${mExp.length} txn${mExp.length === 1 ? '' : 's'} · ${pctExp}% of income</div></div>
+    <div class="metric"><div class="metric-label">Savings — ${label}</div>
       <div class="metric-value blue">${fmt(totSav)}</div>
       <div class="metric-badge" style="background:var(--blue-light);color:var(--blue)">${pctSav}% of income</div></div>
     <div class="metric"><div class="metric-label">Net in hand</div>
@@ -1347,7 +1348,7 @@
             <div class="bar-fill" style="width:${Math.round(amt / maxAmt * 100)}%;background:${CAT_COLOR[cat] || '#888'}"></div>
           </div>
         </div>`).join('')
-        : '<div class="empty">No expenses this month</div>';
+        : `<div class="empty">No expenses for ${label}</div>`;
 
       if (dashChart) { dashChart.destroy(); dashChart = null; }
       if (sorted.length) {
